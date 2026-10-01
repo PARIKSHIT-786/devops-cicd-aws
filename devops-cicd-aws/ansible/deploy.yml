@@ -1,0 +1,41 @@
+---
+- name: Deploy the app container to EC2
+  hosts: web
+  become: true
+  vars:
+    image: "yourdockerhubuser/devops-cicd-demo:latest"
+    container_name: demo-app
+
+  tasks:
+    - name: Install Docker and Python Docker SDK
+      ansible.builtin.apt:
+        name:
+          - docker.io
+          - python3-docker
+        state: present
+        update_cache: true
+
+    - name: Make sure Docker is running
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Run the application container
+      community.docker.docker_container:
+        name: "{{ container_name }}"
+        image: "{{ image }}"
+        pull: true
+        state: started
+        restart_policy: unless-stopped
+        published_ports:
+          - "80:5000"
+
+    - name: Wait for the health endpoint
+      ansible.builtin.uri:
+        url: "http://localhost/health"
+        status_code: 200
+      register: health
+      retries: 10
+      delay: 3
+      until: health.status == 200
